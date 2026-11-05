@@ -68,7 +68,7 @@ docker run --rm --entrypoint /bin/sh netbox-image:test -c \
 
 Checked on 2026-11-05: NetBox and netbox-docker Apache-2.0, netbox-plugin-prometheus-sd 2.2.0
 MIT, netbox-topology-views 5.0.1 Apache-2.0; Actions: actions/checkout MIT, docker/*-action
-Apache-2.0.
+(setup-qemu included) Apache-2.0.
 
 ## Commits and PRs: no Claude attribution
 

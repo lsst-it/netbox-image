@@ -35,6 +35,10 @@ The `Build` workflow then builds, smoke-tests and pushes `docker.io/lsstit/netbo
 Pushes to `main` publish `main` and `sha-<short>` (for trials); pull requests build and test
 only.
 
+Every tag is a multi-arch image, **linux/amd64 and linux/arm64**: each architecture is built and
+smoke-tested natively (an arm64 runner), and only when both pass are they pushed together under
+one tag.
+
 **Bumping NetBox**: change the `FROM` tag together with the chart version in k8s-cookbook (its
 appVersion), check that each plugin supports the new version (their compatibility tables), tag
 `v<new version>-1`, deploy on the dev instance first. Renovate proposes base-image and plugin bumps.
