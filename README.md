@@ -1,7 +1,7 @@
 # netbox-image
 
 NetBox for LSST IT: the upstream [netbox-docker](https://github.com/netbox-community/netbox-docker)
-image with the plugins we run, published as **`ghcr.io/lsst-it/netbox`** and deployed by
+image with the plugins we run, published as **`docker.io/lsstit/netbox`** and deployed by
 k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on ruka (netbox.dev) and luan (netbox.ls).
 
 | Plugin | Version | Why |
@@ -30,7 +30,7 @@ for that version (plugin bumps, build changes). A release is a git tag:
 git tag v4.7.4-1 && git push origin v4.7.4-1
 ```
 
-The `Build` workflow then builds, smoke-tests and pushes `ghcr.io/lsst-it/netbox:v4.7.4-1`.
+The `Build` workflow then builds, smoke-tests and pushes `docker.io/lsstit/netbox:v4.7.4-1`.
 Pushes to `main` publish `main` and `sha-<short>` (for trials); pull requests build and test
 only.
 
@@ -48,9 +48,11 @@ and the topology page renders.
 
 ## Registry
 
-The package `ghcr.io/lsst-it/netbox` must be **public**: the clusters pull ghcr.io images
-anonymously (no `imagePullSecrets` in k8s-cookbook). After the first push, set it in the
-package settings (Change visibility), and link it to this repository.
+Docker Hub, organization `lsstit` (with our other images: cnpg-backup, cnpgsphere, …):
+<https://hub.docker.com/orgs/lsstit/repositories>. The workflow logs in with the lsst-it org
+secrets `DOCKERHUB_LSSTIT_USERNAME` / `DOCKERHUB_LSSTIT_PASSWORD` (as cnpg-backup does); they
+must be available to this repository. The repository `lsstit/netbox` must be **public**: the
+clusters pull without `imagePullSecrets`.
 
 ## Git hooks
 
