@@ -26,11 +26,14 @@ client.force_login(user)
 failed = []
 for name, url, accept in (
     ("prometheus-sd devices", "/api/plugins/prometheus-sd/devices/", "application/json"),
+    # Without a query string the topology page saves the user's options (IndividualOptions, a
+    # plugin table) and redirects to itself with them: follow it, but never to the login page.
     ("topology-views home", reverse("plugins:netbox_topology_views:home"), "text/html"),
 ):
-    response = client.get(url, HTTP_ACCEPT=accept)
-    print(f"{name}: GET {url} -> {response.status_code}")
-    if response.status_code != 200:
+    response = client.get(url, HTTP_ACCEPT=accept, follow=True)
+    hops = [hop for hop, _ in response.redirect_chain]
+    print(f"{name}: GET {' -> '.join([url, *hops])} -> {response.status_code}")
+    if response.status_code != 200 or any("/login/" in hop for hop in hops):
         failed.append(name)
     elif accept == "application/json" and not isinstance(response.json(), list):
         failed.append(f"{name} (not a JSON list)")

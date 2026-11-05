@@ -17,9 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # Throwaway backends for the smoke test only, never part of the image. In the clusters NetBox
+    # uses netbox-pg (CNPG, ghcr.io/cloudnative-pg/postgresql:17) and the chart's Valkey subchart
+    # (Bitnami, Valkey 9): keep the same major versions here.
     services:
       postgres:
-        image: postgres:17  # NetBox 4.7 needs PostgreSQL 15 or later
+        image: postgres:17
         env:
           POSTGRES_USER: netbox
           POSTGRES_PASSWORD: netbox
@@ -29,7 +32,7 @@ jobs:
           --health-cmd "pg_isready -U netbox"
           --health-interval 5s --health-timeout 5s --health-retries 20
       valkey:
-        image: valkey/valkey:8
+        image: valkey/valkey:9
         ports: ["6379:6379"]
     steps:
       - uses: actions/checkout@v6
@@ -45,9 +48,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Runs like the chart's securityContext: uid 1000, read-only root filesystem, /tmp writable
+      # (an emptyDir there), so a plugin that writes into the image at runtime fails here first.
       - name: smoke test (migrate, plugin endpoint, topology page)
         run: |
-          docker run --rm --network host \
+          docker run --rm --network host --user 1000:1000 --read-only --tmpfs /tmp \
             -e DB_HOST=localhost -e DB_NAME=netbox -e DB_USER=netbox -e DB_PASSWORD=netbox \
             -e REDIS_HOST=localhost -e REDIS_CACHE_HOST=localhost \
             -e SECRET_KEY=ci-only-dummy-key-ci-only-dummy-key-ci-only-0123456789 \

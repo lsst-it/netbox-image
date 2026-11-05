@@ -42,9 +42,15 @@ appVersion), check that each plugin supports the new version (their compatibilit
 
 Neither plugin is tested upstream on NetBox 4.7.4 (prometheus-sd's CI stops at 4.7.0;
 topology-views' catalog says up to 4.7.3, its code sets no maximum), so every build runs the image
-against PostgreSQL 17 and Valkey: `migrate` (the plugins' migrations included), then
-`tests/smoke.py` checks that both plugins are enabled, the http_sd endpoint returns a JSON list
-and the topology page renders.
+against throwaway PostgreSQL 17 and Valkey 9 containers (CI only; the image contains no database):
+`migrate` (the plugins' migrations included), then `tests/smoke.py` checks that both plugins are
+enabled, the http_sd endpoint returns a JSON list and the topology page renders. It runs as the
+chart does: uid 1000, read-only root filesystem, only `/tmp` writable.
+
+In the clusters the database is netbox-pg (CNPG, `fleet/lib/netbox-pg`) and the cache is the
+chart's Valkey subchart; the chart's own `configuration.py` replaces netbox-docker's and reads
+`plugins` / `pluginsConfig` from its values. None of that changes with this image: only
+`image.registry`, `image.repository` and `image.tag`.
 
 ## Registry
 
