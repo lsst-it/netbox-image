@@ -1,1 +1,65 @@
 # netbox-image
+
+NetBox for LSST IT: the upstream [netbox-docker](https://github.com/netbox-community/netbox-docker)
+image with the plugins we run, published as **`ghcr.io/lsst-it/netbox`** and deployed by
+k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on ruka (netbox.dev) and luan (netbox.ls).
+
+| Plugin | Version | Why |
+|---|---|---|
+| [netbox-plugin-prometheus-sd](https://github.com/FlxPeters/netbox-plugin-prometheus-sd) | 2.2.0 | Prometheus `http_sd`: scrape targets from NetBox's devices (`/api/plugins/prometheus-sd/devices/`) |
+| [netbox-topology-views](https://github.com/netbox-community/netbox-topology-views) | 5.0.1 | Topology drawings from NetBox's cables |
+
+## What's in the image
+
+- `FROM ghcr.io/netbox-community/netbox:v4.7.4`, the chart's appVersion.
+- The plugins installed into NetBox's venv (`plugin_requirements.txt`).
+- Their static files, collected at build time. The clusters run NetBox with a read-only root
+  filesystem, so nothing can be collected or uploaded at runtime (custom topology images
+  included: bake them in).
+- **No runtime configuration.** The plugins are installed but not enabled: the chart enables them
+  with `plugins` and configures them with `pluginsConfig`. `configuration/plugins.py` is used
+  only for `collectstatic` and the CI smoke test, and the Dockerfile removes it from the image
+  (left in `/etc/netbox/config/`, netbox-docker would load it and override the chart's values).
+
+## Tags and releases
+
+`v<NetBox version>-<revision>`, e.g. `v4.7.4-1`: the NetBox version, then this image's revision
+for that version (plugin bumps, build changes). A release is a git tag:
+
+```sh
+git tag v4.7.4-1 && git push origin v4.7.4-1
+```
+
+The `Build` workflow then builds, smoke-tests and pushes `ghcr.io/lsst-it/netbox:v4.7.4-1`.
+Pushes to `main` publish `main` and `sha-<short>` (for trials); pull requests build and test
+only.
+
+**Bumping NetBox**: change the `FROM` tag together with the chart version in k8s-cookbook (its
+appVersion), check that each plugin supports the new version (their compatibility tables), tag
+`v<new version>-1`, deploy on netbox.dev first. Renovate proposes base-image and plugin bumps.
+
+## CI smoke test
+
+Neither plugin is tested upstream on NetBox 4.7.4 (prometheus-sd's CI stops at 4.7.0;
+topology-views' catalog says up to 4.7.3, its code sets no maximum), so every build runs the image
+against PostgreSQL 17 and Valkey: `migrate` (the plugins' migrations included), then
+`tests/smoke.py` checks that both plugins are enabled, the http_sd endpoint returns a JSON list
+and the topology page renders.
+
+## Registry
+
+The package `ghcr.io/lsst-it/netbox` must be **public**: the clusters pull ghcr.io images
+anonymously (no `imagePullSecrets` in k8s-cookbook). After the first push, set it in the
+package settings (Change visibility), and link it to this repository.
+
+## Git hooks
+
+Enable the shared hooks once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+`commit-msg` rejects commits with a `Co-Authored-By` trailer for Claude
+(`<noreply@anthropic.com>`); the `Block Claude Co-Author` workflow enforces the same on every pull
+request.

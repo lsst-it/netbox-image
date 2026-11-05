@@ -1,0 +1,2 @@
+netbox-plugin-prometheus-sd==2.2.0
+netbox-topology-views==5.0.1
