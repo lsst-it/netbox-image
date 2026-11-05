@@ -4,14 +4,15 @@ NetBox for LSST IT: the upstream [netbox-docker](https://github.com/netbox-commu
 image with the plugins we run, published as **`docker.io/lsstit/netbox`** and deployed by
 k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on our dev and production NetBox instances.
 
-| Plugin | Version | Why |
-|---|---|---|
-| [netbox-plugin-prometheus-sd](https://github.com/FlxPeters/netbox-plugin-prometheus-sd) | 2.2.0 | Prometheus `http_sd`: scrape targets from NetBox's devices (`/api/plugins/prometheus-sd/devices/`) |
-| [netbox-topology-views](https://github.com/netbox-community/netbox-topology-views) | 5.0.1 | Topology drawings from NetBox's cables |
+| Plugin | Version | License | Why |
+|---|---|---|---|
+| [netbox-plugin-prometheus-sd](https://github.com/FlxPeters/netbox-plugin-prometheus-sd) | 2.2.0 | MIT | Prometheus `http_sd`: scrape targets from NetBox's devices (`/api/plugins/prometheus-sd/devices/`) |
+| [netbox-topology-views](https://github.com/netbox-community/netbox-topology-views) | 5.0.1 | Apache-2.0 | Topology drawings from NetBox's cables |
 
 ## What's in the image
 
-- `FROM ghcr.io/netbox-community/netbox:v4.7.4`, the chart's appVersion.
+- `FROM ghcr.io/netbox-community/netbox:v4.7.4`, the chart's appVersion (NetBox and
+  netbox-docker are Apache-2.0, like this repository).
 - The plugins installed into NetBox's venv (`plugin_requirements.txt`).
 - Their static files, collected at build time. The clusters run NetBox with a read-only root
   filesystem, so nothing can be collected or uploaded at runtime (custom topology images
