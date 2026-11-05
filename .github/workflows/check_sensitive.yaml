@@ -1,0 +1,40 @@
+# yamllint disable rule:quoted-strings
+name: Check sensitive data
+
+"on": pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  sensitive-check:
+    name: Check sensitive data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Every commit of the PR, not only the net diff: a credential added and then removed in
+      # the same PR is still in its history, so it must be rotated.
+      - name: reject credentials and never-committed files (every commit)
+        env:
+          BASE: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHECK_SENSITIVE: credentials
+        run: |
+          git log -p -U0 --no-color --no-ext-diff --format= "$BASE..$HEAD_SHA" \
+            | sh .githooks/check-sensitive
+
+      # Internal network details on what the PR leaves in the tree (squash-merge a PR whose
+      # history had them and the net diff fixes them). The internal names come from a repo
+      # secret, not a variable: this repository and its logs are public, secrets are masked.
+      - name: reject internal network details (net diff)
+        env:
+          BASE: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SENSITIVE_NAMES: ${{ secrets.SENSITIVE_NAMES }}
+        run: |
+          [ -n "$SENSITIVE_NAMES" ] || echo "::warning::secret SENSITIVE_NAMES not set: internal names not checked"
+          git diff -U0 --no-color --no-ext-diff "$BASE...$HEAD_SHA" \
+            | sh .githooks/check-sensitive
