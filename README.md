@@ -2,7 +2,7 @@
 
 NetBox for LSST IT: the upstream [netbox-docker](https://github.com/netbox-community/netbox-docker)
 image with the plugins we run, published as **`docker.io/lsstit/netbox`** and deployed by
-k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on ruka (netbox.dev) and luan (netbox.ls).
+k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on our dev and production NetBox instances.
 
 | Plugin | Version | Why |
 |---|---|---|
@@ -36,7 +36,7 @@ only.
 
 **Bumping NetBox**: change the `FROM` tag together with the chart version in k8s-cookbook (its
 appVersion), check that each plugin supports the new version (their compatibility tables), tag
-`v<new version>-1`, deploy on netbox.dev first. Renovate proposes base-image and plugin bumps.
+`v<new version>-1`, deploy on the dev instance first. Renovate proposes base-image and plugin bumps.
 
 ## CI smoke test
 
@@ -71,3 +71,17 @@ git config core.hooksPath .githooks
 `commit-msg` rejects commits with a `Co-Authored-By` trailer for Claude
 (`<noreply@anthropic.com>`); the `Block Claude Co-Author` workflow enforces the same on every pull
 request.
+
+This repository is public: `pre-commit` (`.githooks/check-sensitive`) rejects credentials and
+internal network details (addresses, `lsst.org` names, site and device names). The `Check
+sensitive data` workflow runs the same on every pull request: credentials on every commit,
+network details on the net diff. A false positive is committed with `--no-verify` after a person
+has checked it.
+
+Internal names (clusters, instances) are not listed in this public repository. Each clone sets
+them as an extended-regex alternation, and the PR check reads the same value from the repository
+secret `SENSITIVE_NAMES` (a secret because the logs are public):
+
+```sh
+git config sensitive.names '<name>|<name>|...'
+```

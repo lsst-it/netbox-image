@@ -1,0 +1,101 @@
+#!/bin/sh
+# Reject credentials, internal network details and files that must never be committed, in a
+# unified diff read on stdin. This repository is public (CLAUDE.md). Only added lines and added /
+# changed paths are checked. Used by .githooks/pre-commit (the staged diff) and the "Check
+# sensitive data" PR check.
+#
+# CHECK_SENSITIVE=credentials limits it to credential shapes and files (the PR check runs that on
+# every commit, and the full check on the PR's net diff).
+#
+# Matches are reported as path:line and a reason, never with the value. A false positive is
+# committed with --no-verify, after a person has checked it. Anything the patterns miss is the
+# reviewer's job (CLAUDE.md).
+
+tmp=$(mktemp -d) || exit 2
+trap 'rm -rf "$tmp"' EXIT
+: > "$tmp/lines"
+: > "$tmp/paths"
+
+# "path:line:text" for every added line, and every path added or changed (not deleted).
+# Plain POSIX awk (mawk on the CI runner): the patterns are matched by grep -E below.
+awk -v lines="$tmp/lines" -v paths="$tmp/paths" '
+  function flush() { if (pending != "") print pending > paths; pending = "" }
+  /^diff --git / {
+    flush(); pending = $0; sub(/^diff --git a\/.* b\//, "", pending); file = ""; header = 1; next
+  }
+  header && /^deleted file mode/ { pending = ""; next }
+  header && /^\+\+\+ / { file = substr($0, 5); sub(/^b\//, "", file); next }
+  /^@@ / { header = 0; split($3, a, ","); n = substr(a[1], 2) + 0; next }
+  header { next }
+  /^\+/ { if (file != "" && file != "/dev/null") print file ":" n ":" substr($0, 2) > lines; n++; next }
+  /^ / { n++ }
+  END { flush() }
+'
+
+# CI's throwaway values (build.yaml, Dockerfile) are not secrets: blank them before matching.
+sed -E -e 's/PASSWORD=netbox([^A-Za-z0-9_]|$)/\1/g' \
+  -e 's/=(ci|build)-only-dummy-key[A-Za-z0-9-]*//g' "$tmp/lines" > "$tmp/creds"
+# This script holds the network patterns themselves.
+grep -v '^\.githooks/check-sensitive:' "$tmp/lines" > "$tmp/net"
+
+found=0
+report() {  # reason; reads path:line:... lines on stdin
+  while IFS= read -r hit; do
+    echo "  $(echo "$hit" | cut -d: -f1,2): $1" >&2
+    found=1
+  done
+}
+line() {  # file, reason, grep options and pattern
+  src=$1
+  reason=$2
+  shift 2
+  grep "$@" "$tmp/$src" > "$tmp/hits" && report "$reason" < "$tmp/hits"
+}
+path() {  # reason, extended pattern on the path
+  grep -E "$2" "$tmp/paths" | grep -v -E '(^|/)\.env\.example$' | sort -u |
+    sed 's/$/:-/' > "$tmp/hits" && report "$1" < "$tmp/hits"
+}
+
+# Credentials
+line creds "private key" -E -e '-----BEGIN [A-Z ]*PRIVATE KEY'
+line creds "AWS access key" -E -e 'A(KIA|SIA)[0-9A-Z]{16}'
+line creds "AWS secret key" -i -E -e 'aws_secret_access_key["'"'"' ]*[:=] *["'"'"']?[A-Za-z0-9/+]{20,}'
+line creds "GitHub token" -E -e '(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}'
+line creds "Docker Hub token" -E -e 'dckr_(pat|oat)_[A-Za-z0-9_-]{20,}'
+line creds "1Password service account token" -E -e 'ops_ey[A-Za-z0-9_-]{30,}'
+line creds "JWT (1Password Connect, OAuth)" -E -e 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}'
+line creds "NetBox v2 token" -E -e 'nbt_[A-Za-z0-9]{8,}\.[A-Za-z0-9]{16,}'
+line creds "NetBox v1 token" -i -E -e 'token[^0-9a-z]{1,20}[0-9a-f]{40}'
+line creds "secret variable with a value" -E \
+  -e '([A-Z0-9_]*TOKEN|[A-Z0-9_]*PASSWORD|[A-Z0-9_]*SECRET[A-Z0-9_]*|API_TOKEN_PEPPERS)=[^ "'"'"'$<{`]'
+
+path ".env file" '(^|/)\.env($|\.)'
+path "key or certificate file" '\.(pem|key|crt|p12|pfx)$|(^|/)id_(rsa|dsa|ecdsa|ed25519)'
+path "NetBox export or dump" '\.(sql|dump)(\.gz)?$'
+
+# Internal network details (the repository is public)
+if [ "${CHECK_SENSITIVE:-all}" != credentials ]; then
+  line net "LSST public address (139.229/16, 140.252/16)" -E \
+    -e '(^|[^0-9.])(139\.229|140\.252)\.[0-9]{1,3}\.[0-9]{1,3}'
+  line net "private address (RFC 1918)" -E \
+    -e '(^|[^0-9.])(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\.[0-9]{1,3}\.[0-9]{1,3}'
+  line net "internal domain or address (lsst.org)" -i -E -e '[a-z0-9-]\.lsst\.org|@lsst\.org'
+  line net "internal site, rack or device name" -i -E -e '(^|[^a-z0-9])(bdc|sdc)-[a-z0-9]'
+  # Cluster and instance names are kept out of this public repository: an extended-regex
+  # alternation in SENSITIVE_NAMES (the PR check, from the repo secret) or in the clone's
+  # `git config sensitive.names` (pre-commit).
+  names=${SENSITIVE_NAMES:-$(git config --get sensitive.names 2>/dev/null)}
+  if [ -n "$names" ]; then
+    line net "internal name (sensitive.names)" -i -E -e "(^|[^a-z0-9])($names)([^a-z0-9]|\$)"
+  else
+    echo "check-sensitive: internal names not checked (set git config sensitive.names)" >&2
+  fi
+fi
+
+if [ "$found" -ne 0 ]; then
+  echo "check-sensitive: the lines above look like credentials, internal network details or" >&2
+  echo "files that must not be committed to this public repository (values not shown). Remove" >&2
+  echo "them; a leaked credential is rotated first. A false positive is committed with" >&2
+  echo "--no-verify, after a person has checked it." >&2
+  exit 1
+fi
