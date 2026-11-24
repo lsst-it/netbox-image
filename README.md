@@ -7,11 +7,11 @@ k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on our dev and production Ne
 | Plugin | Version | License | Why |
 |---|---|---|---|
 | [netbox-plugin-prometheus-sd](https://github.com/FlxPeters/netbox-plugin-prometheus-sd) | 2.2.0 | MIT | Prometheus `http_sd`: scrape targets from NetBox's devices (`/api/plugins/prometheus-sd/devices/`) |
-| [netbox-topology-views](https://github.com/netbox-community/netbox-topology-views) | 5.0.1 | Apache-2.0 | Topology drawings from NetBox's cables |
+| [netbox-topology-views](https://github.com/netbox-community/netbox-topology-views) | 5.0.3 | Apache-2.0 | Topology drawings from NetBox's cables |
 
 ## What's in the image
 
-- `FROM ghcr.io/netbox-community/netbox:v4.7.4`, the chart's appVersion (NetBox and
+- `FROM ghcr.io/netbox-community/netbox:v4.7.5`, the chart's appVersion (NetBox and
   netbox-docker are Apache-2.0, like this repository).
 - The plugins installed into NetBox's venv (`plugin_requirements.txt`).
 - Their static files, collected at build time. The clusters run NetBox with a read-only root
@@ -24,14 +24,14 @@ k8s-cookbook (`fleet/lib/netbox`, the netbox-chart) on our dev and production Ne
 
 ## Tags and releases
 
-`v<NetBox version>-<revision>`, e.g. `v4.7.4-1`: the NetBox version, then this image's revision
+`v<NetBox version>-<revision>`, e.g. `v4.7.5-1`: the NetBox version, then this image's revision
 for that version (plugin bumps, build changes). A release is a git tag:
 
 ```sh
-git tag v4.7.4-1 && git push origin v4.7.4-1
+git tag v4.7.5-1 && git push origin v4.7.5-1
 ```
 
-The `Build` workflow then builds, smoke-tests and pushes `docker.io/lsstit/netbox:v4.7.4-1`.
+The `Build` workflow then builds, smoke-tests and pushes `docker.io/lsstit/netbox:v4.7.5-1`.
 Pushes to `main` publish `main` and `sha-<short>` (for trials); pull requests build and test
 only.
 
@@ -45,8 +45,8 @@ appVersion), check that each plugin supports the new version (their compatibilit
 
 ## CI smoke test
 
-Neither plugin is tested upstream on NetBox 4.7.4 (prometheus-sd's CI stops at 4.7.0;
-topology-views' catalog says up to 4.7.3, its code sets no maximum), so every build runs the image
+Neither plugin is tested upstream on NetBox 4.7.5 (prometheus-sd's CI stops at 4.7.0;
+topology-views' code sets 4.7.0 as the minimum and no maximum), so every build runs the image
 against throwaway PostgreSQL 17 and Valkey 9 containers (CI only; the image contains no database):
 `migrate` (the plugins' migrations included), then `tests/smoke.py` checks that both plugins are
 enabled, the http_sd endpoint returns a JSON list and the topology page renders. It runs as the

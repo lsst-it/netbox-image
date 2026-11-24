@@ -1,7 +1,7 @@
 # NetBox with the plugins LSST IT runs (see README.md).
 # The base tag follows the netbox-chart appVersion that k8s-cookbook deploys (fleet/lib/netbox):
 # bump them together.
-FROM ghcr.io/netbox-community/netbox:v4.7.4
+FROM ghcr.io/netbox-community/netbox:v4.7.5
 
 # Into NetBox's venv (the base image sets VIRTUAL_ENV=/opt/netbox/venv).
 COPY plugin_requirements.txt /opt/netbox/plugin_requirements.txt
